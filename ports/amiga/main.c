@@ -22,6 +22,11 @@
 #include <proto/dos.h>
 #include <proto/exec.h>
 
+_Static_assert(
+    offsetof(mp_state_ctx_t, thread.dict_locals) % 4 == 0,
+    "Root pointer alignment broken on m68k - reapply ports/amiga/patches/mpstate_alignment.patch"
+);
+
 // Tell AmigaOS/libnix to allocate a 128 KB stack for this process.
 long __stack = 131072;
 

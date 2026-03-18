@@ -25,7 +25,8 @@ reviewed and validated by a human before being committed.
 - **os.path**: join, split, basename, dirname, exists, isfile, isdir, abspath,
   normpath (with AmigaOS volume:path conventions)
 - **Modules**: re, json, math, struct, binascii, base64, time, datetime,
-  random, hashlib (sha256), errno, platform, gc, sys, io
+  random, hashlib (sha256), errno, platform, socket, gc, sys, io
+- **Networking**: TCP/UDP sockets, DNS resolution via bsdsocket.library
 - **Platform detection**: `platform.amiga_info()` shows CPU, FPU, chipset,
   Kickstart version, and available memory
 
@@ -74,7 +75,7 @@ True
 - `time.ticks_ms()` returns 0 (no high-resolution timer yet)
 - No Ctrl-C during script execution (only in REPL input)
 - `hashlib` only supports SHA256 (MD5/SHA1 require TLS library)
-- No networking (no socket/select modules)
+- Sockets are always blocking (no non-blocking mode)
 - No multithreading
 
 ## License

@@ -43,6 +43,7 @@ Compiler flags:
 | `main.c` | Entry point, custom REPL with readline, dynamic heap via AllocMem, -c/-m options, VFS mount, curdir save/restore |
 | `amiga_mphal.c` | Console I/O: raw mode Read(Input())/Write(Output()), CSI-to-ANSI translation, delays via usleep |
 | `modamigaos.c` | Low-level `uos` C module (listdir, getcwd, chdir, mkdir, rmdir, remove, rename, stat, system, _stat_type) |
+| `modsocket.c` | BSD socket module (socket, connect, bind, send, recv, getaddrinfo) via libsocket/bsdsocket.library |
 | `modtime.c` | Time implementation for AmigaOS (gmtime/localtime/time via libnix) |
 | `qstrdefsport.h` | Port-specific qstrings (empty) |
 | `manifest.py` | Frozen Python module declarations (base64, datetime, _ospath, os) |
@@ -241,6 +242,30 @@ Edit `manifest.py` and add `freeze("path", "file.py")` or `require("name")`
 `lib/micropython-lib/python-stdlib/` and `lib/micropython-lib/micropython/`.
 Then `gmake clean && gmake`.
 
+## Module socket (AmigaOS -- modsocket.c)
+
+Native C module providing BSD sockets via libnix `libsocket.a`, which wraps
+AmigaOS `bsdsocket.library`. Requires a TCP/IP stack (e.g. Roadshow, Miami,
+AmiTCP) to be running.
+
+### Functions and classes
+
+- `socket.socket(family, type, proto)`: create a socket (defaults: AF_INET, SOCK_STREAM, 0)
+- `socket.getaddrinfo(host, port)`: DNS resolution, returns list of 5-tuples
+- Constants: `AF_INET`, `AF_INET6`, `SOCK_STREAM`, `SOCK_DGRAM`, `SOL_SOCKET`, `SO_REUSEADDR`
+
+### Socket methods
+
+- `connect(addr)`, `bind(addr)`, `listen([backlog])`, `accept()`
+- `send(data)`, `recv(bufsize)`, `sendto(data, addr)`, `recvfrom(bufsize)`
+- `setsockopt(level, optname, value)`, `setblocking(flag)` (no-op)
+- `close()`, `fileno()`
+
+### Limitations
+
+- Sockets are always blocking (no non-blocking/timeout support)
+- Linked with `-lsocket` in the Makefile
+
 ## Module time (AmigaOS)
 
 Implemented via `modtime.c` (included by extmod/modtime.c via
@@ -315,6 +340,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `hashlib`: sha256 (built-in, no TLS needed; MD5/SHA1 not available)
 - `errno`: POSIX error constants
 - `platform`: system/CPU/FPU/chipset/Kickstart detection (frozen, uses uos C helpers)
+- `socket`: TCP/UDP sockets, DNS resolution (native C module via libsocket/bsdsocket.library)
 
 ### Frozen (Python modules embedded in binary)
 
@@ -335,7 +361,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 ### Disabled
 
 - `_thread`: no multithreading (no pthreads on AmigaOS)
-- `socket`: no networking
+- `socket`: available (see below)
 - `select`: no I/O multiplexing
 - `signal`: no POSIX signals
 - `ffi`: no FFI

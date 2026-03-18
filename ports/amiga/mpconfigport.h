@@ -51,9 +51,7 @@
 #define MICROPY_VFS_POSIX               (1)
 #define MICROPY_READER_VFS              (1)
 #define MICROPY_PY_FFI                  (0)
-#define MICROPY_PY_SOCKET               (0)
 #define MICROPY_PY_TERMIOS              (0)
-#define MICROPY_PY_SELECT               (0)
 #define MICROPY_PY_SIGNAL               (0)
 
 // Disable sys features not useful on AmigaOS

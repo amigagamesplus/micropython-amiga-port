@@ -23,7 +23,7 @@ The binary `build/micropython` is an AmigaOS hunk executable (magic `0x000003f3`
 directly runnable on Amiga 68020+ or in an emulator.
 
 Build number auto-increments on each compilation (stored in `.build_number`).
-Banner example: `MicroPython v1.27.0 on 2026-03-17 14:00 build 42; Amiga with M68020`
+Banner example: `MicroPython v1.27.0 on 2026-03-18 14:00 build 42; Amiga with M68020`
 
 Compiler flags:
 - `-noixemul`: uses libnix instead of ixemul.library (no POSIX emulation)
@@ -39,27 +39,28 @@ Compiler flags:
 |------|------|
 | `Makefile` | Cross-compiled build, py.mk + extmod.mk inclusion, build number |
 | `mpconfigport.h` | MicroPython feature configuration for AmigaOS |
-| `mphalport.h` | HAL: ticks stubs, delays, time_ns, readline via fgets |
-| `main.c` | Entry point, custom REPL (do_repl), dynamic heap via AllocMem, argv, builtins, curdir save/restore |
-| `amiga_mphal.c` | Console I/O: stdin (CR->LF), stdout, amiga_prompt (fgets), delays via usleep |
-| `modamigaos.c` | Standalone `os` module (listdir, getcwd, chdir, system, _stat_type via dos.library) |
+| `mphalport.h` | HAL: ticks stubs, delays, time_ns, raw/cooked mode switch, MP_HAL_RETRY_SYSCALL |
+| `main.c` | Entry point, custom REPL with readline, dynamic heap via AllocMem, -c/-m options, VFS mount, curdir save/restore |
+| `amiga_mphal.c` | Console I/O: raw mode Read(Input())/Write(Output()), CSI-to-ANSI translation, delays via usleep |
+| `modamigaos.c` | Low-level `uos` C module (listdir, getcwd, chdir, mkdir, rmdir, remove, rename, stat, system, _stat_type) |
 | `modtime.c` | Time implementation for AmigaOS (gmtime/localtime/time via libnix) |
 | `qstrdefsport.h` | Port-specific qstrings (empty) |
-| `manifest.py` | Frozen Python module declarations (base64, datetime, _ospath) |
+| `manifest.py` | Frozen Python module declarations (base64, datetime, _ospath, os) |
 | `modules/datetime.py` | Patched local copy of datetime (fixed __repr__) |
 | `modules/_ospath.py` | os.path implementation for AmigaOS path conventions |
+| `modules/os.py` | Frozen os module: re-exports uos, adds makedirs() and walk(), imports _ospath as path |
 | `patches/` | Patches to upstream MicroPython files (see patches/README.md) |
 | `run_tests.py` | Test runner: runs each test in a separate micropython process |
 
 ### Architecture Decisions
 
 **No POSIX.** AmigaOS is not POSIX. All POSIX code from the unix port was removed:
-no fork, no pthreads, no mmap, no POSIX signals, no termios, no select/poll, no
-POSIX VFS.
+no fork, no pthreads, no mmap, no POSIX signals, no termios, no select/poll.
 
 **libnix (-noixemul).** Uses libnix which provides a minimal libc (malloc, stdio,
-string, setjmp, time, gmtime) without depending on ixemul.library. Consequence:
-`shared/libc/printf.c` and `shared/libc/abort_.c` are excluded from the build via
+string, setjmp, time, gmtime, open, read, write, stat, opendir...) without
+depending on ixemul.library. Consequence: `shared/libc/printf.c` and
+`shared/libc/abort_.c` are excluded from the build via
 `SRC_EXTMOD_C := $(filter-out shared/libc/%.c,$(SRC_EXTMOD_C))` in the Makefile,
 since libnix already provides these symbols.
 
@@ -75,11 +76,23 @@ epoch calculations.
 MicroPython bytecode is interpreted only.
 
 **ROM level CORE_FEATURES.** Intermediate feature level providing a functional REPL
-with essential builtins without excessive RAM usage.
+with essential builtins without excessive RAM usage. Additional modules (random,
+hashlib, errno, help) are explicitly enabled on top of this level.
+
+**VFS_POSIX for file I/O.** `MICROPY_VFS=1` and `MICROPY_VFS_POSIX=1` enable
+full `open()`/`read()`/`write()`/`close()` support. The POSIX VFS is mounted at
+`/` during `vm_init()`. libnix provides all required POSIX symbols (open, close,
+read, write, stat, lseek, mkdir, rmdir, unlink, opendir, readdir, etc.).
+`mp_lexer_new_from_file()` and `mp_import_stat()` are provided by VFS.
 
 **sys.path enabled.** `MICROPY_PY_SYS_PATH=1` is required for frozen module imports.
 At startup, `mp_init()` creates `sys.path = ["", ".frozen"]`. The `.frozen/` virtual
 path triggers lookup in `mp_find_frozen_module()`.
+
+**Two-layer os module (uos + os.py).** The C module `modamigaos.c` is registered
+as `uos` (via `MP_REGISTER_MODULE(MP_QSTR_uos, ...)`). A frozen `os.py` does
+`from uos import *` and adds `makedirs()`, `walk()`, and `import _ospath as path`.
+This allows extending os with Python functions while keeping C functions fast.
 
 **No binascii frozen shim.** `manifest.py` freezes `base64.py` directly (via
 `freeze()` instead of `require()`) to avoid pulling the Python `binascii.py` shim
@@ -88,26 +101,19 @@ from micropython-lib, which shadows the C binascii module.
 **Patched datetime.py.** The `__repr__` of `date` in micropython-lib displays the
 internal ordinal instead of year/month/day. The local copy in `modules/datetime.py`
 fixes this. The time module import uses `__import__("time")` to work around the
-name collision with `class time` defined in the same file (`from time import ...`
-fails in frozen modules when the module name appears as a local symbol).
+name collision with `class time` defined in the same file.
 
-**Standalone os module (modamigaos.c).** The generic extmod `os` module
-(`MICROPY_PY_OS`) is disabled. A native `modamigaos.c` replaces it, registered via
-`MP_REGISTER_MODULE(MP_QSTR_os, ...)`. Uses dos.library directly for filesystem
-operations.
-
-**Dynamic heap via AllocMem.** The 512 KB GC heap is allocated dynamically via
-`AllocMem(MICROPY_HEAP_SIZE, MEMF_ANY | MEMF_CLEAR)` instead of a static BSS
-array. This keeps the binary small and only uses Amiga memory at runtime.
-`FreeMem()` is called on normal exit and in crash handlers (`nlr_jump_fail`,
-`__assert_func`).
+**Dynamic heap via AllocMem.** The GC heap (default 256 KB) is allocated dynamically
+via `AllocMem(heap_size, MEMF_ANY | MEMF_CLEAR)`. Size is configurable via the
+`-m` command line option. `FreeMem()` is called on normal exit and in crash handlers
+(`nlr_jump_fail`, `__assert_func`). Available RAM is checked before allocation.
 
 **Stack 128 KB.** `long __stack = 131072;` in main.c tells libnix to allocate
 128 KB of stack at launch. Required for the recursive Python parser and GC collect.
 
 **extmod.mk included.** The Makefile includes `extmod/extmod.mk` to compile C
-extension modules (re, json, binascii, time...). Objects go through `PY_O` (not
-`PY_CORE_O`) to include everything.
+extension modules (re, json, binascii, time, random, hashlib, errno...). Objects
+go through `PY_O` (not `PY_CORE_O`) to include everything.
 
 ## m68k GC Alignment (Critical)
 
@@ -135,29 +141,46 @@ The `gc.c:952` assertion may still trigger due to false positives from stack
 scanning (heap-like addresses on the stack). `NDEBUG` is defined in
 `mpconfigport.h` as a workaround.
 
-## Module os (AmigaOS -- modamigaos.c)
+## Command Line
 
-Standalone module replacing the generic os module (`MICROPY_PY_OS=0`).
-Registered via `MP_REGISTER_MODULE(MP_QSTR_os, mp_module_amiga_os)`.
+```
+micropython                          # launch interactive REPL
+micropython script.py                # execute a script
+micropython script.py arg1 arg2      # execute with sys.argv = ['script.py', 'arg1', 'arg2']
+micropython -c "print('hello')"      # execute inline code
+micropython -m 1024 script.py        # execute with 1024 KB heap
+micropython -m 512                   # launch REPL with 512 KB heap
+```
 
-### Functions
+The `-m <size_kb>` option must come first. Default heap is 256 KB.
+The `-c <code>` option executes Python code and exits.
 
-- `os.listdir([path])`: list directory contents via
-  `Lock/Examine/ExNext/UnLock` + `AllocDosObject(DOS_FIB)`.
-  No argument lists the current directory (path="").
-  Rejects files with `MP_ENOTDIR` (checks `fib_DirEntryType`).
-- `os.getcwd()`: returns current directory via `NameFromLock()` on the current
-  lock (obtained by `CurrentDir(0)` + restore). Does NOT use
-  `GetCurrentDirName()` since it reads the CLI structure which is not updated
-  by `CurrentDir()`.
-- `os.chdir(path)`: changes directory via `Lock(path)/CurrentDir(lock)`.
-  Properly `UnLock()`s the previous lock, except for the original shell lock
-  (preserved via global `original_dir` from main.c).
-- `os.system(cmd)`: executes a shell command via libnix `system()`.
-- `os._stat_type(path)`: returns 1 for directory, 2 for file, 0 if not found.
-  Uses `Lock/Examine/fib_DirEntryType/FreeDosObject/UnLock`.
-- `os.sep`: `"/"` (AmigaOS uses `/` for subdirectories and `:` for volumes).
-- `os.path`: lazy-loaded via `__getattr__` -- imports frozen `_ospath` module.
+## Module uos / os (AmigaOS)
+
+The C module `uos` (`modamigaos.c`) provides low-level filesystem operations
+using dos.library. The frozen `os.py` re-exports everything from `uos` and adds
+`makedirs()`, `walk()`, and `os.path`.
+
+### C functions (uos / modamigaos.c)
+
+- `listdir([path])`: directory contents via Lock/Examine/ExNext. Rejects files (ENOTDIR).
+- `getcwd()`: current directory via NameFromLock on CurrentDir lock.
+- `chdir(path)`: change directory, UnLocks old lock (preserves shell original_dir).
+- `mkdir(path)`: create directory via CreateDir/UnLock.
+- `rmdir(path)`: remove empty directory (verifies is dir, then DeleteFile).
+- `remove(path)`: remove file (verifies is NOT dir, then DeleteFile).
+- `rename(old, new)`: rename via dos.library Rename().
+- `stat(path)`: 10-element tuple (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime).
+  DateStamp converted to Unix epoch (+252460800s offset).
+- `system(cmd)`: execute shell command via libnix system().
+- `_stat_type(path)`: 0=not found, 1=dir, 2=file (used by _ospath).
+- `sep`: `"/"`.
+
+### Python extensions (os.py)
+
+- `makedirs(name, exist_ok=False)`: recursive directory creation with AmigaOS path support.
+- `walk(top, topdown=True)`: directory tree generator yielding (dirpath, dirnames, filenames).
+- `path`: the `_ospath` module (join, split, basename, dirname, exists, isfile, isdir, etc.).
 
 ### Current directory management
 
@@ -167,14 +190,12 @@ BPTR original_dir = 0;  // global
 original_dir = CurrentDir(0);
 CurrentDir(original_dir);
 ```
-Restores it before exit: `CurrentDir(original_dir)`. This ensures the shell
-recovers its directory after running micropython, even if scripts used
-`os.chdir()`.
+Restores it before exit: `CurrentDir(original_dir)`.
 
 ## Module os.path (AmigaOS -- _ospath.py)
 
 Frozen Python module implementing os.path for AmigaOS path conventions.
-Loaded lazily via `os.__getattr__` when `os.path` is accessed.
+Loaded via `import _ospath as path` in the frozen `os.py`.
 
 ### AmigaOS path conventions
 
@@ -187,30 +208,14 @@ Loaded lazily via `os.__getattr__` when `os.path` is accessed.
 
 ### Functions
 
-- `sep`: `"/"`
-- `join(*paths)`: join path components with AmigaOS conventions
-- `split(path)` -> `(head, tail)`: split at last `/` or `:`
-- `basename(path)`, `dirname(path)`: wrappers around `split()`
-- `splitext(path)` -> `(root, ext)`: split at last `"."`
-- `isabs(path)`: True if path contains `":"`
-- `normpath(path)`: resolves `"."` and `".."`
-- `abspath(path)`: uses `os.getcwd()` for relative paths
-- `exists(path)`: True if file or directory exists (via `os._stat_type()`)
-- `isfile(path)`: True if regular file (via `os._stat_type()`)
-- `isdir(path)`: True if directory (via `os._stat_type()`)
+- `sep`, `join`, `split`, `basename`, `dirname`, `splitext`
+- `isabs`, `normpath`, `abspath`
+- `exists`, `isfile`, `isdir` (via `uos._stat_type()`)
 
 ## Frozen Modules
 
 Frozen modules are Python files compiled to bytecode (.mpy) by mpy-cross, then
 embedded in the C binary via `frozen_content.c`. Importable without a filesystem.
-
-### Mechanism
-
-1. `manifest.py` declares modules to freeze via `freeze("path", "file.py")`
-2. `FROZEN_MANIFEST` in the Makefile points to this file
-3. mkrules.mk calls `tools/makemanifest.py` which compiles `.py` to `.mpy`
-   and generates `build/frozen_content.c`
-4. This C file is compiled and linked into the binary
 
 ### Current frozen modules
 
@@ -218,7 +223,8 @@ embedded in the C binary via `frozen_content.c`. Importable without a filesystem
 |--------|--------|-------------|
 | `base64` | micropython-lib/python-stdlib/base64 | `binascii` (C extmod) |
 | `datetime` | local copy `modules/datetime.py` | `time` (C extmod) |
-| `_ospath` | local `modules/_ospath.py` | `os` (native C module) |
+| `_ospath` | local `modules/_ospath.py` | `uos` (C module) |
+| `os` | local `modules/os.py` | `uos` (C module), `_ospath` |
 
 ### Adding a frozen module
 
@@ -233,8 +239,7 @@ Implemented via `modtime.c` (included by extmod/modtime.c via
 `MICROPY_PY_TIME_INCLUDEFILE`):
 
 - `time.time()`: seconds since epoch 1970 via libnix `time()`
-- `time.time_ns()`: nanoseconds since epoch (second resolution, via
-  `mp_hal_time_ns()` = `time() * 1e9`)
+- `time.time_ns()`: nanoseconds since epoch (second resolution)
 - `time.gmtime([secs])` / `time.localtime([secs])`: 8-element tuple
 - `time.mktime(tuple)`: inverse conversion
 - `time.sleep(secs)` / `time.sleep_ms(ms)` / `time.sleep_us(us)`: `usleep()` libnix
@@ -242,69 +247,35 @@ Implemented via `modtime.c` (included by extmod/modtime.c via
 
 Epoch is 1970 (`MICROPY_EPOCH_IS_1970=1`), matching libnix `time()`.
 
-## Script Execution
-
-### Command line
-
-```
-micropython                      # launch interactive REPL
-micropython script.py            # execute a script
-micropython script.py arg1 arg2  # execute with sys.argv = ['script.py', 'arg1', 'arg2']
-```
-
-A single script is executed (argv[1]). Additional arguments are passed in
-`sys.argv` (populated with argv[1:] after `mp_init()`).
-
-### Filesystem
-
-`mp_lexer_new_from_file()` reads files into memory via `fopen/fseek/fread`,
-enabling:
-- Execution of `.py` scripts from the command line
-- `import` of `.py` modules from the AmigaOS filesystem
-
-`mp_import_stat()` checks file existence via `fopen`.
-
-### Test runner (run_tests.py)
-
-Runs each `test_*.py` file in a separate micropython process via
-`os.system("micropython " + filepath)`. Ensures a fresh VM per test.
-
-```
-micropython run_tests.py tests/
-micropython run_tests.py tests/test_math.py tests/test_string.py
-```
-
 ## AmigaOS Specifics
 
-### REPL (cooked mode / fgets)
+### REPL (readline with raw mode)
 
-The REPL uses cooked (line-buffered) mode via `fgets()` in `amiga_prompt()`.
-No readline: `MICROPY_USE_READLINE=0`. Line editing is handled natively by the
-AmigaOS console (left/right arrows, backspace). No history or tab completion.
+The REPL uses `shared/readline/readline.c` (`MICROPY_USE_READLINE=1`) with
+50-entry command history. The AmigaOS console is switched to raw mode via
+`SetMode(Input(), 1)` for character-by-character input, and restored to cooked
+mode via `SetMode(Input(), 0)` after each command execution and on exit.
 
-The REPL is implemented by `do_repl()` in `main.c` which uses `mp_hal_readline()`
-(wrapper around `amiga_prompt/fgets`) and parses with `MP_PARSE_SINGLE_INPUT` so
-expressions print their result (e.g. `1+1` prints `2`). Multi-line blocks
-(if/for/def/class) are handled via `mp_repl_continue_with_input()`.
+Console I/O uses `Read(Input())` and `Write(Output())` from dos.library
+(not stdio fgets/fwrite) for raw mode compatibility.
 
-`shared/readline/readline.c` is included in the build because `pyexec.c`
-references it, but it is not actively used.
+### CSI Translation
 
-### CR vs LF
-
-AmigaOS sends CR (`\r`, 13) as line ending instead of LF (`\n`, 10).
-- `amiga_prompt()` strips trailing CR and LF
-- `mp_hal_stdin_rx_chr()` converts `\r` to `\n`
+AmigaOS sends CSI (0x9B / 155) + letter for cursor keys, but MicroPython
+readline expects ANSI ESC (27) + '[' (91) + letter. `mp_hal_stdin_rx_chr()`
+translates on the fly: when it receives 155, it returns 27 (ESC) and queues
+'[' for the next call.
 
 ### Exiting the REPL
 
-Four ways to exit:
 - `quit()` or `exit()`: port-defined builtins, raise `SystemExit`
 - `sys.exit()`: standard MicroPython (`MICROPY_PY_SYS_EXIT=1`)
-- Ctrl-C: detected as `\x03` at start of line in `do_repl()`
-- EOF (end of file redirection): `amiga_prompt()` returns NULL
+- Ctrl-D: exit REPL cleanly
+- Ctrl-C: cancel current input
+- Ctrl-E: enter paste mode
 
-The REPL prints "Bye!" before quitting.
+Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
+`__assert_func`) to avoid leaving the shell in raw mode.
 
 ## Enabled Modules
 
@@ -318,15 +289,13 @@ The REPL prints "Bye!" before quitting.
 - `micropython`: MicroPython introspection
 - `io`: StringIO, BytesIO
 
-### Module os (standalone native -- modamigaos.c)
+### Module os (uos C + frozen os.py)
 
-- `os.listdir([path])`: directory contents (dos.library Examine/ExNext)
-- `os.getcwd()`: current directory (NameFromLock)
-- `os.chdir(path)`: change directory (Lock/CurrentDir, UnLocks old lock)
-- `os.system(cmd)`: execute shell command
-- `os._stat_type(path)`: 0=not found, 1=dir, 2=file (Lock/Examine)
-- `os.sep`: `"/"`
-- `os.path`: lazy-loaded _ospath module
+- `os.listdir`, `os.getcwd`, `os.chdir`, `os.system`, `os.sep`
+- `os.mkdir`, `os.rmdir`, `os.remove`, `os.rename`, `os.stat`
+- `os.makedirs(name, exist_ok=False)`: recursive directory creation
+- `os.walk(top, topdown=True)`: directory tree generator
+- `os.path`: join, split, basename, dirname, exists, isfile, isdir, etc.
 
 ### Explicitly enabled (C extmod modules)
 
@@ -334,19 +303,24 @@ The REPL prints "Bye!" before quitting.
 - `json`: JSON encoding/decoding
 - `binascii`: hexlify, unhexlify, a2b_base64, b2a_base64
 - `time`: time, gmtime, localtime, mktime, sleep, ticks_ms/us/cpu
+- `random`: random, randint, randrange, choice, uniform
+- `hashlib`: sha256 (built-in, no TLS needed; MD5/SHA1 not available)
+- `errno`: POSIX error constants
 
 ### Frozen (Python modules embedded in binary)
 
 - `base64`: base64, base32, base16 encoding/decoding
 - `datetime`: date, time, datetime, timedelta (patched local copy)
-- `_ospath`: os.path for AmigaOS (join, split, exists, isfile, isdir, etc.)
+- `_ospath`: os.path for AmigaOS
+- `os`: os module wrapper (makedirs, walk, path)
 
 ### Port-added builtins
 
 - `quit([code])`: exit REPL (raise SystemExit)
 - `exit([code])`: alias for quit()
-- `input([prompt])`: line reading via `amiga_prompt()`
-- `open(file)`: file reading via fopen/fread (read-only stub)
+- `input([prompt])`: line reading
+- `open(file, mode)`: full file I/O via VFS_POSIX (read and write)
+- `help()`, `help('modules')`: built-in help
 
 ### Disabled
 
@@ -356,12 +330,15 @@ The REPL prints "Bye!" before quitting.
 - `signal`: no POSIX signals
 - `ffi`: no FFI
 - `termios`: no POSIX terminal control
-- VFS: no MicroPython VFS (filesystem handled directly via dos.library)
+- `hashlib.md5`, `hashlib.sha1`: require mbedTLS/axTLS (not available)
 
 ## Memory
 
-- GC heap: 512 KB dynamic via `AllocMem(MICROPY_HEAP_SIZE, MEMF_ANY | MEMF_CLEAR)`,
+- GC heap: 256 KB default, configurable via `-m <kb>` (e.g. `-m 1024` for 1 MB)
+  Dynamic allocation via `AllocMem(heap_size, MEMF_ANY | MEMF_CLEAR)`,
   freed by `FreeMem()` on exit and in crash handlers
+- Available RAM checked before allocation; warning if >80% requested
+- Heap size and available RAM displayed in REPL banner
 - Stack: 128 KB minimum (`long __stack = 131072` in main.c)
 - Qstr: 2048-byte chunks, 2-byte length, 2-byte hash
 - GC collect: `gc_helper_collect_regs_and_stack()` via `gchelper_generic.c`
@@ -382,17 +359,13 @@ The REPL prints "Bye!" before quitting.
 ## Known Limitations
 
 - `time.ticks_ms()` is a stub (no high-resolution clock yet)
-- `mp_hal_set_interrupt_char()` is a no-op (no Ctrl-C during execution)
-- Input line limited to 255 characters (amiga_prompt buffer)
-- `open()` is read-only (no file writing)
-- No cursor key history in REPL (would need raw mode + CSI translation)
+- `mp_hal_set_interrupt_char()` is a no-op (no Ctrl-C during script execution)
+- `hashlib` only supports SHA256 (MD5/SHA1 require TLS library)
+- `hashlib.sha256().digest()` can only be called once (MicroPython limitation)
 
 ## Future Work
 
-- File writing via `open()` mode "w" (dos.library Open/Write/Close)
 - High-resolution clock via timer.device or ReadEClock() for ticks_ms/ticks_us
-- Ctrl-C support via `SetSignal()` / `CheckSignal()` (SIGBREAKF_CTRL_C)
-- REPL readline with cursor keys/history (needs raw mode + CSI translation)
-- Add `os.remove()`, `os.mkdir()`, `os.rename()` via dos.library
-- Add more frozen modules (hashlib, collections, etc.)
+- Ctrl-C support during script execution via `SetSignal()` / `CheckSignal()`
+- Add more frozen modules (collections, etc.)
 - Investigate gc.c:952 assertion root cause (remove NDEBUG)

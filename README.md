@@ -27,6 +27,7 @@ reviewed and validated by a human before being committed.
 - **Modules**: re, json, math, struct, binascii, base64, time, datetime,
   random, hashlib (sha256), errno, platform, socket, gc, sys, io
 - **Networking**: TCP/UDP sockets, DNS resolution via bsdsocket.library
+- **HTTP client**: `urequests.get()`, `post()`, `put()`, `delete()` (HTTP only, no TLS)
 - **Platform detection**: `platform.amiga_info()` shows CPU, FPU, chipset,
   Kickstart version, and available memory
 

@@ -51,6 +51,7 @@ Compiler flags:
 | `modules/_ospath.py` | os.path implementation for AmigaOS path conventions |
 | `modules/os.py` | Frozen os module: re-exports uos, adds makedirs() and walk(), imports _ospath as path |
 | `modules/platform.py` | Frozen platform module: CPU/FPU/chipset/Kickstart detection via uos C helpers |
+| `modules/urequests.py` | Frozen HTTP client module (GET, POST, PUT, DELETE, HEAD) |
 | `patches/` | Patches to upstream MicroPython files (see patches/README.md) |
 | `run_tests.py` | Test runner: runs each test in a separate micropython process |
 
@@ -234,6 +235,7 @@ embedded in the C binary via `frozen_content.c`. Importable without a filesystem
 | `_ospath` | local `modules/_ospath.py` | `uos` (C module) |
 | `os` | local `modules/os.py` | `uos` (C module), `_ospath` |
 | `platform` | local `modules/platform.py` | `uos` (C module), `sys` |
+| `urequests` | local `modules/urequests.py` | `socket` (C module), `json` |
 
 ### Adding a frozen module
 
@@ -357,6 +359,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `_ospath`: os.path for AmigaOS
 - `os`: os module wrapper (makedirs, walk, path)
 - `platform`: system, machine, processor, version, fpu, chipset, amiga_info
+- `urequests`: HTTP client (get, post, put, delete, head) — HTTP only, no TLS
 
 ### Port-added builtins
 

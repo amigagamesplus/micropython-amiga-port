@@ -5,7 +5,7 @@
 #   A path is absolute if it contains ":"
 #   join("DH0:", "work") -> "DH0:work" (no slash after colon)
 
-import os
+import uos
 
 sep = "/"
 
@@ -91,19 +91,19 @@ def normpath(path):
 def abspath(path):
     if isabs(path):
         return normpath(path)
-    cwd = os.getcwd()
+    cwd = uos.getcwd()
     if cwd.endswith(":") or cwd.endswith("/"):
         return normpath(cwd + path)
     return normpath(cwd + "/" + path)
 
 
 def exists(path):
-    return os._stat_type(path) != 0
+    return uos._stat_type(path) != 0
 
 
 def isdir(path):
-    return os._stat_type(path) == 1
+    return uos._stat_type(path) == 1
 
 
 def isfile(path):
-    return os._stat_type(path) == 2
+    return uos._stat_type(path) == 2

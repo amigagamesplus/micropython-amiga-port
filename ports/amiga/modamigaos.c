@@ -1,5 +1,6 @@
-// Standalone 'os' module for the AmigaOS port.
-// Replaces the generic extmod os module (MICROPY_PY_OS=0).
+// Low-level 'uos' module for the AmigaOS port.
+// The frozen 'os' module (os.py) re-exports everything from uos
+// and adds makedirs() and walk().
 // Uses dos.library for filesystem operations.
 
 #include <stdlib.h>
@@ -8,7 +9,6 @@
 #include "py/runtime.h"
 #include "py/objstr.h"
 #include "py/mperrno.h"
-#include "py/builtin.h"
 
 #include <proto/dos.h>
 #include <dos/dos.h>
@@ -249,18 +249,8 @@ static mp_obj_t mod_os_stat(mp_obj_t path_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_stat_obj, mod_os_stat);
 
-// os.__getattr__ — lazy-load os.path from frozen _ospath module.
-static mp_obj_t os_module___getattr__(mp_obj_t attr) {
-    if (attr == MP_OBJ_NEW_QSTR(MP_QSTR_path)) {
-        mp_obj_t args[] = { MP_OBJ_NEW_QSTR(MP_QSTR__ospath) };
-        return mp_builtin___import__(1, args);
-    }
-    return MP_OBJ_NULL;
-}
-MP_DEFINE_CONST_FUN_OBJ_1(os_module___getattr___obj, os_module___getattr__);
-
 static const mp_rom_map_elem_t os_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_os) },
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_uos) },
     { MP_ROM_QSTR(MP_QSTR_listdir), MP_ROM_PTR(&mod_os_listdir_obj) },
     { MP_ROM_QSTR(MP_QSTR_getcwd), MP_ROM_PTR(&mod_os_getcwd_obj) },
     { MP_ROM_QSTR(MP_QSTR_chdir), MP_ROM_PTR(&mod_os_chdir_obj) },
@@ -272,7 +262,6 @@ static const mp_rom_map_elem_t os_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_stat), MP_ROM_PTR(&mod_os_stat_obj) },
     { MP_ROM_QSTR(MP_QSTR_sep), MP_ROM_QSTR(MP_QSTR__slash_) },
     { MP_ROM_QSTR(MP_QSTR__stat_type), MP_ROM_PTR(&mod_os_stat_type_obj) },
-    { MP_ROM_QSTR(MP_QSTR___getattr__), MP_ROM_PTR(&os_module___getattr___obj) },
 };
 static MP_DEFINE_CONST_DICT(os_module_globals, os_module_globals_table);
 
@@ -281,4 +270,4 @@ const mp_obj_module_t mp_module_amiga_os = {
     .globals = (mp_obj_dict_t *)&os_module_globals,
 };
 
-MP_REGISTER_MODULE(MP_QSTR_os, mp_module_amiga_os);
+MP_REGISTER_MODULE(MP_QSTR_uos, mp_module_amiga_os);

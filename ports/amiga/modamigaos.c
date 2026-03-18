@@ -117,6 +117,138 @@ static mp_obj_t mod_os_stat_type(mp_obj_t path_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_stat_type_obj, mod_os_stat_type);
 
+// AmigaOS epoch is 1 Jan 1978, Unix epoch is 1 Jan 1970.
+// Difference in seconds: 8 years (2 leap) = 2922 days * 86400 = 252460800.
+#define AMIGA_EPOCH_OFFSET 252460800
+
+// Convert AmigaOS DateStamp to Unix timestamp.
+static mp_int_t datestamp_to_unix(const struct DateStamp *ds) {
+    return (mp_int_t)((long)ds->ds_Days * 86400L
+        + (long)ds->ds_Minute * 60L
+        + (long)ds->ds_Tick / TICKS_PER_SECOND)
+        + AMIGA_EPOCH_OFFSET;
+}
+
+// os.mkdir(path) — create a directory.
+static mp_obj_t mod_os_mkdir(mp_obj_t path_in) {
+    const char *path = mp_obj_str_get_str(path_in);
+    BPTR lock = CreateDir((CONST_STRPTR)path);
+    if (lock == 0) {
+        mp_raise_OSError(MP_EIO);
+    }
+    UnLock(lock);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_mkdir_obj, mod_os_mkdir);
+
+// os.rmdir(path) — remove an empty directory.
+static mp_obj_t mod_os_rmdir(mp_obj_t path_in) {
+    const char *path = mp_obj_str_get_str(path_in);
+    // Verify it is a directory
+    BPTR lock = Lock((CONST_STRPTR)path, SHARED_LOCK);
+    if (lock == 0) {
+        mp_raise_OSError(MP_ENOENT);
+    }
+    struct FileInfoBlock *fib = AllocDosObject(DOS_FIB, NULL);
+    if (fib == NULL) {
+        UnLock(lock);
+        mp_raise_OSError(MP_ENOMEM);
+    }
+    int is_dir = 0;
+    if (Examine(lock, fib)) {
+        is_dir = (fib->fib_DirEntryType > 0);
+    }
+    FreeDosObject(DOS_FIB, fib);
+    UnLock(lock);
+    if (!is_dir) {
+        mp_raise_OSError(MP_ENOTDIR);
+    }
+    if (!DeleteFile((CONST_STRPTR)path)) {
+        mp_raise_OSError(MP_EIO);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_rmdir_obj, mod_os_rmdir);
+
+// os.remove(path) — remove a file (not a directory).
+static mp_obj_t mod_os_remove(mp_obj_t path_in) {
+    const char *path = mp_obj_str_get_str(path_in);
+    // Verify it is NOT a directory
+    BPTR lock = Lock((CONST_STRPTR)path, SHARED_LOCK);
+    if (lock == 0) {
+        mp_raise_OSError(MP_ENOENT);
+    }
+    struct FileInfoBlock *fib = AllocDosObject(DOS_FIB, NULL);
+    if (fib == NULL) {
+        UnLock(lock);
+        mp_raise_OSError(MP_ENOMEM);
+    }
+    int is_dir = 0;
+    if (Examine(lock, fib)) {
+        is_dir = (fib->fib_DirEntryType > 0);
+    }
+    FreeDosObject(DOS_FIB, fib);
+    UnLock(lock);
+    if (is_dir) {
+        mp_raise_OSError(MP_EISDIR);
+    }
+    if (!DeleteFile((CONST_STRPTR)path)) {
+        mp_raise_OSError(MP_EIO);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_remove_obj, mod_os_remove);
+
+// os.rename(old, new) — rename a file or directory.
+static mp_obj_t mod_os_rename(mp_obj_t old_in, mp_obj_t new_in) {
+    const char *old_path = mp_obj_str_get_str(old_in);
+    const char *new_path = mp_obj_str_get_str(new_in);
+    if (!Rename((CONST_STRPTR)old_path, (CONST_STRPTR)new_path)) {
+        mp_raise_OSError(MP_EIO);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(mod_os_rename_obj, mod_os_rename);
+
+// os.stat(path) — return a 10-element stat_result tuple.
+static mp_obj_t mod_os_stat(mp_obj_t path_in) {
+    const char *path = mp_obj_str_get_str(path_in);
+    BPTR lock = Lock((CONST_STRPTR)path, SHARED_LOCK);
+    if (lock == 0) {
+        mp_raise_OSError(MP_ENOENT);
+    }
+    struct FileInfoBlock *fib = AllocDosObject(DOS_FIB, NULL);
+    if (fib == NULL) {
+        UnLock(lock);
+        mp_raise_OSError(MP_ENOMEM);
+    }
+    if (!Examine(lock, fib)) {
+        FreeDosObject(DOS_FIB, fib);
+        UnLock(lock);
+        mp_raise_OSError(MP_EIO);
+    }
+    // st_mode: directory = 0040755, file = 0100644
+    mp_int_t st_mode = (fib->fib_DirEntryType > 0) ? 0040755 : 0100644;
+    mp_int_t st_size = fib->fib_Size;
+    mp_int_t st_time = datestamp_to_unix(&fib->fib_Date);
+    FreeDosObject(DOS_FIB, fib);
+    UnLock(lock);
+
+    mp_obj_t items[10];
+    items[0] = MP_OBJ_NEW_SMALL_INT(st_mode);  // st_mode
+    items[1] = MP_OBJ_NEW_SMALL_INT(0);         // st_ino
+    items[2] = MP_OBJ_NEW_SMALL_INT(0);         // st_dev
+    items[3] = MP_OBJ_NEW_SMALL_INT(1);         // st_nlink
+    items[4] = MP_OBJ_NEW_SMALL_INT(0);         // st_uid
+    items[5] = MP_OBJ_NEW_SMALL_INT(0);         // st_gid
+    items[6] = MP_OBJ_NEW_SMALL_INT(st_size);   // st_size
+    items[7] = mp_obj_new_int(st_time);          // st_atime
+    items[8] = mp_obj_new_int(st_time);          // st_mtime
+    items[9] = mp_obj_new_int(st_time);          // st_ctime
+    return mp_obj_new_tuple(10, items);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_stat_obj, mod_os_stat);
+
 // os.__getattr__ — lazy-load os.path from frozen _ospath module.
 static mp_obj_t os_module___getattr__(mp_obj_t attr) {
     if (attr == MP_OBJ_NEW_QSTR(MP_QSTR_path)) {
@@ -133,6 +265,11 @@ static const mp_rom_map_elem_t os_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_getcwd), MP_ROM_PTR(&mod_os_getcwd_obj) },
     { MP_ROM_QSTR(MP_QSTR_chdir), MP_ROM_PTR(&mod_os_chdir_obj) },
     { MP_ROM_QSTR(MP_QSTR_system), MP_ROM_PTR(&mod_os_system_obj) },
+    { MP_ROM_QSTR(MP_QSTR_mkdir), MP_ROM_PTR(&mod_os_mkdir_obj) },
+    { MP_ROM_QSTR(MP_QSTR_rmdir), MP_ROM_PTR(&mod_os_rmdir_obj) },
+    { MP_ROM_QSTR(MP_QSTR_remove), MP_ROM_PTR(&mod_os_remove_obj) },
+    { MP_ROM_QSTR(MP_QSTR_rename), MP_ROM_PTR(&mod_os_rename_obj) },
+    { MP_ROM_QSTR(MP_QSTR_stat), MP_ROM_PTR(&mod_os_stat_obj) },
     { MP_ROM_QSTR(MP_QSTR_sep), MP_ROM_QSTR(MP_QSTR__slash_) },
     { MP_ROM_QSTR(MP_QSTR__stat_type), MP_ROM_PTR(&mod_os_stat_type_obj) },
     { MP_ROM_QSTR(MP_QSTR___getattr__), MP_ROM_PTR(&os_module___getattr___obj) },

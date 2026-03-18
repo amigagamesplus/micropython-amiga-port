@@ -47,7 +47,7 @@ MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_exit_obj, 0, 1, mp_builtin_quit);
 
 // Line-buffered REPL using mp_hal_readline (fgets) + mp_repl_continue_with_input.
 static void do_repl(void) {
-    mp_hal_stdout_tx_str("MicroPython " MICROPY_GIT_TAG " on " AMIGA_BUILD_TIMESTAMP
+    mp_hal_stdout_tx_str("MicroPython v" MICROPY_VERSION_STRING " on " AMIGA_BUILD_TIMESTAMP
         " build " AMIGA_BUILD_NUM "; " MICROPY_BANNER_MACHINE "\n");
     mp_hal_stdout_tx_str("Use quit() or Ctrl-C to exit\n");
 

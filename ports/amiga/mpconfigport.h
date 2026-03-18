@@ -14,6 +14,8 @@
 #define MICROPY_HELPER_REPL             (1)
 #define MICROPY_ENABLE_EXTERNAL_IMPORT  (1)
 #define MICROPY_PY_BUILTINS_INPUT       (1)
+#define MICROPY_PY_BUILTINS_HELP        (1)
+#define MICROPY_PY_BUILTINS_HELP_MODULES (1)
 
 // No readline for now; use line-buffered (cooked) input from AmigaOS console
 #define MICROPY_USE_READLINE            (0)

@@ -44,6 +44,7 @@ Compiler flags:
 | `amiga_mphal.c` | Console I/O: raw mode Read(Input())/Write(Output()), CSI-to-ANSI translation, delays via usleep |
 | `modamigaos.c` | Low-level `uos` C module (listdir, getcwd, chdir, mkdir, rmdir, remove, rename, stat, system, _stat_type) |
 | `modsocket.c` | BSD socket module (socket, connect, bind, send, recv, getaddrinfo) via libsocket/bsdsocket.library |
+| `modssl.c` | SSL/TLS module via AmiSSL (wrap_socket, custom BIO with saveds callbacks) |
 | `modtime.c` | Time implementation for AmigaOS (gmtime/localtime/time via libnix) |
 | `qstrdefsport.h` | Port-specific qstrings (empty) |
 | `manifest.py` | Frozen Python module declarations (base64, datetime, _ospath, os) |
@@ -111,8 +112,10 @@ via `AllocMem(heap_size, MEMF_ANY | MEMF_CLEAR)`. Size is configurable via the
 `-m` command line option. `FreeMem()` is called on normal exit and in crash handlers
 (`nlr_jump_fail`, `__assert_func`). Available RAM is checked before allocation.
 
-**Stack 128 KB.** `long __stack = 131072;` in main.c tells libnix to allocate
-128 KB of stack at launch. Required for the recursive Python parser and GC collect.
+**Stack 128 KB + StackSwap.** `long __stack = 131072;` in main.c tells libnix to
+allocate 128 KB of stack. Additionally, `ensure_stack()` checks the actual stack
+at the start of `main()` and uses `StackSwap()` to allocate a 64 KB stack if the
+shell didn't provide enough. `restore_stack()` is called on all exit paths.
 
 **extmod.mk included.** The Makefile includes `extmod/extmod.mk` to compile C
 extension modules (re, json, binascii, time, random, hashlib, errno...). Objects
@@ -235,7 +238,7 @@ embedded in the C binary via `frozen_content.c`. Importable without a filesystem
 | `_ospath` | local `modules/_ospath.py` | `uos` (C module) |
 | `os` | local `modules/os.py` | `uos` (C module), `_ospath` |
 | `platform` | local `modules/platform.py` | `uos` (C module), `sys` |
-| `urequests` | local `modules/urequests.py` | `socket` (C module), `json` |
+| `urequests` | local `modules/urequests.py` | `socket`, `ssl` (C modules), `json` |
 
 ### Adding a frozen module
 
@@ -275,6 +278,31 @@ AmiTCP) to be running.
 
 - Sockets are always blocking (no non-blocking/timeout support)
 - Linked with `-lsocket` in the Makefile
+
+## Module ssl (AmigaOS -- modssl.c)
+
+Native C module providing TLS via AmiSSL (AmigaOS OpenSSL wrapper). Requires
+`amisslmaster.library` and AmiSSL v4+ installed on the Amiga.
+
+### Architecture
+
+- Uses a custom BIO that routes I/O through libnix `send()`/`recv()` with
+  `__attribute__((saveds))` callbacks (required for A4 register restoration
+  when called from AmiSSL shared library).
+- AmiSSL initialization is done manually (`OpenLibrary` → `InitAmiSSLMaster` →
+  `OpenAmiSSL` → `InitAmiSSL` with `SocketBase` and `errno` pointer).
+- A single global `SSL_CTX` is shared across all connections.
+- `amissl_cleanup()` is called before exit to free the context and close libraries.
+
+### Functions
+
+- `ssl.wrap_socket(sock, server_hostname=None)`: wraps a connected socket with TLS.
+  Returns an `SSLSocket` with `send()`, `recv()`, `read()`, `write()`, `close()`.
+- SSLSocket has a `__del__` finalizer for GC cleanup.
+
+### Link flags
+
+`-lamisslauto -lamisslstubs` in the Makefile (after `-lsocket`).
 
 ## Module time (AmigaOS)
 
@@ -351,6 +379,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `errno`: POSIX error constants
 - `platform`: system/CPU/FPU/chipset/Kickstart detection (frozen, uses uos C helpers)
 - `socket`: TCP/UDP sockets, DNS resolution (native C module via libsocket/bsdsocket.library)
+- `ssl`: TLS via AmiSSL (native C module, custom BIO with saveds callbacks)
 
 ### Frozen (Python modules embedded in binary)
 
@@ -359,7 +388,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `_ospath`: os.path for AmigaOS
 - `os`: os module wrapper (makedirs, walk, path)
 - `platform`: system, machine, processor, version, fpu, chipset, amiga_info
-- `urequests`: HTTP client (get, post, put, delete, head) — HTTP only, no TLS
+- `urequests`: HTTP/HTTPS client (get, post, put, delete, head) via socket + ssl
 
 ### Port-added builtins
 
@@ -386,7 +415,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
   freed by `FreeMem()` on exit and in crash handlers
 - Available RAM checked before allocation; warning if >80% requested
 - Heap size and available RAM displayed in REPL banner
-- Stack: 128 KB minimum (`long __stack = 131072` in main.c)
+- Stack: 128 KB via libnix (`long __stack = 131072`), with StackSwap fallback to 64 KB
 - Qstr: 2048-byte chunks, 2-byte length, 2-byte hash
 - GC collect: `gc_helper_collect_regs_and_stack()` via `gchelper_generic.c`
   (setjmp-based register capture + stack scan)

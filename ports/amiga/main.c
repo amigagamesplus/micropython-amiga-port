@@ -33,6 +33,38 @@ _Static_assert(
 // Tell AmigaOS/libnix to allocate a 128 KB stack for this process.
 long __stack = 131072;
 
+// StackSwap support — if the shell didn't provide enough stack, we allocate our own.
+#include <exec/tasks.h>
+#define MIN_STACK_SIZE 65536
+
+static char *new_stack = NULL;
+static struct StackSwapStruct stack_swap;
+static int stack_swapped = 0;
+
+static void ensure_stack(void) {
+    struct Task *me = FindTask(NULL);
+    ULONG current_stack = (ULONG)me->tc_SPUpper - (ULONG)me->tc_SPLower;
+    if (current_stack < MIN_STACK_SIZE) {
+        new_stack = (char *)AllocMem(MIN_STACK_SIZE, MEMF_ANY);
+        if (new_stack) {
+            stack_swap.stk_Lower = new_stack;
+            stack_swap.stk_Upper = (ULONG)(new_stack + MIN_STACK_SIZE);
+            stack_swap.stk_Pointer = (APTR)(new_stack + MIN_STACK_SIZE);
+            StackSwap(&stack_swap);
+            stack_swapped = 1;
+        }
+    }
+}
+
+static void restore_stack(void) {
+    if (stack_swapped) {
+        StackSwap(&stack_swap);
+        FreeMem(new_stack, MIN_STACK_SIZE);
+        new_stack = NULL;
+        stack_swapped = 0;
+    }
+}
+
 static char *stack_top;
 static char *heap = NULL;
 static unsigned long heap_size = MICROPY_HEAP_SIZE;
@@ -210,6 +242,9 @@ static void vm_init(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+    // Ensure we have enough stack (swap if shell didn't provide enough)
+    ensure_stack();
+
     int stack_dummy;
     stack_top = (char *)&stack_dummy;
 
@@ -245,6 +280,10 @@ int main(int argc, char **argv) {
         mp_deinit();
     }
 
+    // Cleanup AmiSSL if it was initialized
+    extern void amissl_cleanup(void);
+    amissl_cleanup();
+
     // Free dynamically allocated heap.
     if (heap != NULL) {
         FreeMem(heap, heap_size);
@@ -254,6 +293,7 @@ int main(int argc, char **argv) {
     // Restore the shell's original directory.
     CurrentDir(original_dir);
 
+    restore_stack();
     return ret;
 }
 
@@ -277,6 +317,7 @@ void nlr_jump_fail(void *val) {
         FreeMem(heap, heap_size);
         heap = NULL;
     }
+    restore_stack();
     exit(1);
 }
 
@@ -289,6 +330,7 @@ void __assert_func(const char *file, int line, const char *func, const char *exp
         FreeMem(heap, heap_size);
         heap = NULL;
     }
+    restore_stack();
     exit(1);
 }
 #endif

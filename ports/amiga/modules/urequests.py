@@ -56,7 +56,9 @@ class Response:
                     if not chunk:
                         break
                     self._cached = self._cached + chunk
-            self.raw.close()
+            if self.raw:
+                self.raw.close()
+                self.raw = None
         return self._cached
 
     def json(self):
@@ -67,17 +69,19 @@ class Response:
         if self.raw:
             self.raw.close()
             self.raw = None
-        self._cached = None
 
 
 def request(method, url, data=None, json_data=None, headers=None):
     # Parse URL
     # Parse URL
+    use_ssl = False
     if url.startswith("http://"):
         url = url[7:]
         port = 80
     elif url.startswith("https://"):
-        raise NotImplementedError("HTTPS not supported (no TLS)")
+        url = url[8:]
+        port = 443
+        use_ssl = True
     else:
         raise ValueError("Unsupported protocol")
 
@@ -99,6 +103,11 @@ def request(method, url, data=None, json_data=None, headers=None):
     addr = socket.getaddrinfo(host, port)[0][-1]
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(addr)
+
+    # Wrap with TLS if HTTPS
+    if use_ssl:
+        import ssl
+        s = ssl.wrap_socket(s, server_hostname=host)
 
     # Build request
     s.send(b"%s %s HTTP/1.0\r\n" % (method, path))

@@ -22,7 +22,7 @@ CFLAGS += -fdata-sections -ffunction-sections
 CFLAGS += -Wno-error
 
 LDFLAGS += -noixemul -m68020 -Wl,--gc-sections
-LIB += -lm -lsocket
+LIB += -lm -lsocket -lamisslauto -lamisslstubs
 
 CSUPEROPT = -Os
 
@@ -31,13 +31,14 @@ SRC_C = \
 	amiga_mphal.c \
 	modamigaos.c \
 	modsocket.c \
+	modssl.c \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \
 	shared/runtime/gchelper_generic.c \
 	shared/runtime/stdout_helpers.c \
 	shared/timeutils/timeutils.c \
 
-SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c main.c modamigaos.c modsocket.c
+SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c main.c modamigaos.c modsocket.c modssl.c
 
 # Exclude shared/libc sources — libnix already provides libc
 SRC_EXTMOD_C := $(filter-out shared/libc/%.c,$(SRC_EXTMOD_C))

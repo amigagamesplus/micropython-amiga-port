@@ -290,8 +290,10 @@ int main(int argc, char **argv) {
 
     CurrentDir(original_dir);
 
-    // Use _exit() to stay on our 64KB stack — the shell's 4KB stack
-    // is too small for libnix exit cleanup.
+    // Restore original stack and free our 64KB allocation.
+    // _exit() is lightweight (no libamisslauto destructors) so the
+    // shell's original stack is sufficient.
+    restore_stack();
     _exit(ret);
 }
 

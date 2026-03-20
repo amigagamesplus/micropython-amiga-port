@@ -87,6 +87,8 @@
 #define MICROPY_PY_TIME_TIME_TIME_NS    (1)
 #define MICROPY_PY_TIME_INCLUDEFILE     "ports/amiga/modtime.c"
 #define MICROPY_EPOCH_IS_1970           (1)
+#define MICROPY_PY_DEFLATE              (1)
+#define MICROPY_PY_DEFLATE_COMPRESS     (1)
 
 // quit() and exit() builtins
 extern const struct _mp_obj_fun_builtin_var_t mp_builtin_quit_obj;

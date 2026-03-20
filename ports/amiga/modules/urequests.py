@@ -1,7 +1,7 @@
 # urequests — HTTP/1.1 client for MicroPython AmigaOS port
 # Supports GET, POST, PUT, DELETE, HEAD
 # Supports HTTP and HTTPS (via AmiSSL)
-# Handles chunked transfer encoding
+# Handles chunked transfer encoding and gzip decompression
 
 import socket
 
@@ -90,11 +90,11 @@ class Response:
         if self._cached is None:
             te = self.headers.get("transfer-encoding", "")
             if "chunked" in te:
-                self._cached = self._read_chunked()
+                raw_data = self._read_chunked()
             else:
                 cl = self.headers.get("content-length")
                 if cl:
-                    self._cached = self._read_raw(int(cl))
+                    raw_data = self._read_raw(int(cl))
                 else:
                     chunks = []
                     while True:
@@ -102,10 +102,16 @@ class Response:
                         if not chunk:
                             break
                         chunks.append(chunk)
-                    self._cached = b"".join(chunks)
+                    raw_data = b"".join(chunks)
             if self.raw:
                 self.raw.close()
                 self.raw = None
+            # Decompress if gzip/deflate encoded
+            ce = self.headers.get("content-encoding", "")
+            if "gzip" in ce or "deflate" in ce:
+                import deflate, io
+                raw_data = deflate.DeflateIO(io.BytesIO(raw_data), deflate.GZIP).read()
+            self._cached = raw_data
         return self._cached
 
     def json(self):
@@ -159,7 +165,7 @@ def request(method, url, data=None, json_data=None, headers=None):
     s.send(b"%s %s HTTP/1.1\r\n" % (method, path))
     s.send(b"Host: %s\r\n" % host)
     s.send(b"Connection: close\r\n")
-    s.send(b"Accept-Encoding: identity\r\n")
+    s.send(b"Accept-Encoding: gzip\r\n")
     s.send(b"User-Agent: MicroPython-Amiga/1.27\r\n")
 
     if headers:

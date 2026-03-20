@@ -25,11 +25,11 @@ reviewed and validated by a human before being committed.
 - **os.path**: join, split, basename, dirname, exists, isfile, isdir, abspath,
   normpath (with AmigaOS volume:path conventions)
 - **Modules**: re, json, math, struct, binascii, base64, time, datetime,
-  random, hashlib (sha256), errno, platform, socket, ssl, urequests, gc, sys, io
+  random, hashlib (sha256), errno, platform, socket, ssl, urequests, deflate, gc, sys, io
 - **Networking**: TCP/UDP sockets, DNS resolution via bsdsocket.library
 - **TLS/SSL**: HTTPS support via AmiSSL (requires amissl.library on Amiga)
 - **HTTP client**: `urequests.get()`, `post()`, `put()`, `delete()` with HTTP/1.1,
-  chunked transfer encoding, HTTP and HTTPS
+  chunked transfer encoding, gzip decompression, HTTP and HTTPS
 - **Platform detection**: `platform.amiga_info()` shows CPU, FPU, chipset,
   Kickstart version, and available memory
 

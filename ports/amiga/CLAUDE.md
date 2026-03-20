@@ -386,6 +386,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `random`: random, randint, randrange, choice, uniform
 - `hashlib`: sha256 (built-in, no TLS needed; MD5/SHA1 not available)
 - `errno`: POSIX error constants
+- `deflate`: compression/decompression (raw deflate, zlib, gzip via DeflateIO)
 - `platform`: system/CPU/FPU/chipset/Kickstart detection (frozen, uses uos C helpers)
 - `socket`: TCP/UDP sockets, DNS resolution (native C module via libsocket/bsdsocket.library)
 - `ssl`: TLS via AmiSSL (native C module, custom BIO with saveds callbacks)
@@ -397,7 +398,8 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `_ospath`: os.path for AmigaOS
 - `os`: os module wrapper (makedirs, walk, path)
 - `platform`: system, machine, processor, version, fpu, chipset, amiga_info
-- `urequests`: HTTP/1.1 HTTPS client with chunked TE, buffered I/O, via socket + ssl
+- `urequests`: HTTP/1.1 HTTPS client with chunked TE, gzip decompression, buffered I/O
+- `deflate`: compression/decompression (raw deflate, zlib, gzip formats)
 
 ### Port-added builtins
 

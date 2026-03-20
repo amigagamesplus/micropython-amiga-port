@@ -311,12 +311,13 @@ void nlr_jump_fail(void *val) {
     (void)val;
     mp_hal_stdio_mode_orig();
     printf("FATAL: uncaught NLR\n");
+    extern void amissl_cleanup(void);
+    amissl_cleanup();
     if (heap != NULL) {
         FreeMem(heap, heap_size);
         heap = NULL;
     }
-    // Note: restore_stack() may crash on tiny shell stacks, but we skip
-    // it for normal exit. For crash paths, _exit() on our big stack is safer.
+    CurrentDir(original_dir);
     _exit(1);
 }
 
@@ -325,10 +326,13 @@ void __assert_func(const char *file, int line, const char *func, const char *exp
     (void)func;
     mp_hal_stdio_mode_orig();
     printf("Assertion '%s' failed, at file %s:%d\n", expr, file, line);
+    extern void amissl_cleanup(void);
+    amissl_cleanup();
     if (heap != NULL) {
         FreeMem(heap, heap_size);
         heap = NULL;
     }
+    CurrentDir(original_dir);
     _exit(1);
 }
 #endif

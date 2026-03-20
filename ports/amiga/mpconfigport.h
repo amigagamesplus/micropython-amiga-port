@@ -1,7 +1,6 @@
 #include <stdint.h>
 
-// Disable assertions (gc.c:952 triggers on m68k due to stack scan false positives)
-#define NDEBUG
+// NDEBUG removed — assertions re-enabled (gc stack_top bug is fixed)
 
 // MicroPython port configuration for AmigaOS m68k
 

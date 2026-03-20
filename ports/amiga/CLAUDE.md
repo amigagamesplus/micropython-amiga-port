@@ -146,9 +146,9 @@ This 2-byte misalignment causes two critical bugs:
 (see `patches/mpstate_alignment.patch`). A `_Static_assert` in `main.c` catches
 regressions at compile time.
 
-The `gc.c:952` assertion may still trigger due to false positives from stack
-scanning (heap-like addresses on the stack). `NDEBUG` is defined in
-`mpconfigport.h` as a workaround.
+The `gc.c:952` assertion was caused by `stack_top` pointing to the wrong stack
+after `StackSwap()`. This is now fixed — `stack_top` is set to the top of the
+swapped stack. Assertions are fully enabled (no `NDEBUG`).
 
 ## Command Line
 
@@ -440,11 +440,10 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 
 ## Known Bugs
 
-- **GC assertion gc.c:952**: `NDEBUG` is defined to suppress a false positive in
-  `gc_free()` triggered during stack scanning. The root pointer alignment is now
-  correct (fixed via `_gc_lock_pad` in `py/mpstate.h`), but the stack scan can
-  still hit heap-like addresses that trigger the assertion. This does not cause
-  data corruption -- it is a conservative false positive.
+- **GC assertion gc.c:952** (FIXED): was caused by two bugs — misaligned root
+  pointers (fixed via `_gc_lock_pad` in `py/mpstate.h`) and `stack_top` pointing
+  to the wrong stack after `StackSwap()` (fixed by setting `stack_top` to the top
+  of the swapped stack). Assertions are now fully enabled.
 
 ## Known Limitations
 
@@ -458,4 +457,3 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - High-resolution clock via timer.device or ReadEClock() for ticks_ms/ticks_us
 - Ctrl-C support during script execution via `SetSignal()` / `CheckSignal()`
 - Add more frozen modules (collections, etc.)
-- Investigate gc.c:952 assertion root cause (remove NDEBUG)

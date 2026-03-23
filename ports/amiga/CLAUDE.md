@@ -45,6 +45,7 @@ Compiler flags:
 | `modamigaos.c` | Low-level `uos` C module (listdir, getcwd, chdir, mkdir, rmdir, remove, rename, stat, system, _stat_type) |
 | `modsocket.c` | BSD socket module (socket, connect, bind, send, recv, getaddrinfo) via libsocket/bsdsocket.library |
 | `modssl.c` | SSL/TLS module via AmiSSL (wrap_socket, custom BIO with saveds callbacks) |
+| `modarexx.c` | ARexx IPC module (send, exists, ports) via rexxsyslib.library |
 | `modtime.c` | Time implementation for AmigaOS (gmtime/localtime/time via libnix) |
 | `qstrdefsport.h` | Port-specific qstrings (empty) |
 | `manifest.py` | Frozen Python module declarations (base64, datetime, _ospath, os) |
@@ -286,6 +287,27 @@ AmiTCP) to be running.
 - Sockets are always blocking (no non-blocking/timeout support)
 - Linked with `-lsocket` in the Makefile
 
+## Module arexx (AmigaOS -- modarexx.c)
+
+Native C module providing ARexx inter-process communication via
+`rexxsyslib.library`. Allows MicroPython scripts to send commands to any
+ARexx-capable AmigaOS application.
+
+### Functions
+
+- `arexx.exists(portname)`: returns True if the named ARexx port exists
+  (uses Forbid/FindPort/Permit for safe access)
+- `arexx.send(portname, command, result=False)`: sends an ARexx command.
+  Returns RC (int) if result=False, or (RC, result_string) tuple if result=True.
+  Creates a private reply port, sends via PutMsg, waits with WaitPort.
+  Result strings that aren't valid UTF-8 are returned as bytes (Latin-1 fallback).
+- `arexx.ports()`: returns a list of all public port names (snapshot under Forbid)
+
+### Cleanup
+
+`mod_arexx_deinit()` is called before exit to close rexxsyslib.library.
+The library is opened lazily on first `arexx.send()` call.
+
 ## Module ssl (AmigaOS -- modssl.c)
 
 Native C module providing TLS via AmiSSL (AmigaOS OpenSSL wrapper). Requires
@@ -395,6 +417,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `platform`: system/CPU/FPU/chipset/Kickstart detection (frozen, uses uos C helpers)
 - `socket`: TCP/UDP sockets, DNS resolution (native C module via libsocket/bsdsocket.library)
 - `ssl`: TLS via AmiSSL (native C module, custom BIO with saveds callbacks)
+- `arexx`: ARexx IPC (send commands to AmigaOS apps, list ports, check existence)
 
 ### Frozen (Python modules embedded in binary)
 

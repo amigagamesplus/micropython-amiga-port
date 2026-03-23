@@ -290,6 +290,9 @@ int main(int argc, char **argv) {
     extern void amissl_cleanup(void);
     amissl_cleanup();
 
+    extern void mod_arexx_deinit(void);
+    mod_arexx_deinit();
+
     if (heap != NULL) {
         FreeMem(heap, heap_size);
         heap = NULL;

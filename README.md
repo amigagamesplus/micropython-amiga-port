@@ -15,7 +15,7 @@ reviewed and validated by a human before being committed.
 
 ## No need to build
 
-The Amiga binary executable can be found in [micropython](port/amiga/build/micropython)
+The Amiga binary executable can be found in [micropython](ports/amiga/build/micropython) (`ports/amiga/build/`)
 
 ## Features
 

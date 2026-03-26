@@ -260,6 +260,7 @@ embedded in the C binary via `frozen_content.c`. Importable without a filesystem
 | `urequests` | local `modules/urequests.py` | `socket`, `ssl` (C modules), `json` |
 | `gzip` | local `modules/gzip.py` | `deflate`, `io` |
 | `zlib` | local `modules/zlib.py` | `_zlib` (C module), `deflate`, `io` |
+| `zipfile` | local `modules/zipfile.py` | `zlib`, `deflate`, `struct`, `os`, `io` |
 
 ### Adding a frozen module
 
@@ -447,6 +448,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `urequests`: HTTP/1.1 HTTPS client with chunked TE, gzip decompression, buffered I/O
 - `deflate`: compression/decompression (raw deflate, zlib, gzip formats)
 - `zlib`: CPython-compatible zlib API (compress, decompress, crc32) — native C crc32 + frozen Python
+- `zipfile`: read/write ZIP archives (stored + deflated, CRC32 verification, extractall)
 - `gzip`: CPython-compatible gzip.compress()/gzip.decompress() (frozen, wraps deflate)
 
 ### Port-added builtins

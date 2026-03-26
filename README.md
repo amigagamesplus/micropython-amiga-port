@@ -33,7 +33,7 @@ The Amiga binary executable can be found in [micropython](ports/amiga/build/micr
 - **os.path**: join, split, basename, dirname, exists, isfile, isdir, abspath,
   normpath (with AmigaOS volume:path conventions)
 - **Modules**: re, json, math, struct, binascii, base64, time, datetime,
-  random, hashlib (sha256), errno, platform, socket, ssl, urequests, deflate, gzip, arexx, gc, sys, io
+  random, hashlib (sha256), errno, platform, socket, ssl, urequests, deflate, gzip, zlib, arexx, gc, sys, io
 - **Networking**: TCP/UDP sockets, DNS resolution via bsdsocket.library
 - **TLS/SSL**: HTTPS support via AmiSSL (requires amissl.library on Amiga)
 - **HTTP client**: `urequests.get()`, `post()`, `put()`, `delete()` with HTTP/1.1,

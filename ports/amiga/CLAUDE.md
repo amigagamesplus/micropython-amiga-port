@@ -46,6 +46,7 @@ Compiler flags:
 | `modsocket.c` | BSD socket module (socket, connect, bind, send, recv, getaddrinfo) via libsocket/bsdsocket.library |
 | `modssl.c` | SSL/TLS module via AmiSSL (wrap_socket, custom BIO with saveds callbacks) |
 | `modarexx.c` | ARexx IPC module (send, exists, ports) via rexxsyslib.library |
+| `modzlib.c` | Native _zlib module with CRC32 for the frozen zlib module |
 | `modtime.c` | Time implementation for AmigaOS (gmtime/localtime/time via libnix) |
 | `qstrdefsport.h` | Port-specific qstrings (empty) |
 | `manifest.py` | Frozen Python module declarations (base64, datetime, _ospath, os) |
@@ -258,6 +259,7 @@ embedded in the C binary via `frozen_content.c`. Importable without a filesystem
 | `platform` | local `modules/platform.py` | `uos` (C module), `sys` |
 | `urequests` | local `modules/urequests.py` | `socket`, `ssl` (C modules), `json` |
 | `gzip` | local `modules/gzip.py` | `deflate`, `io` |
+| `zlib` | local `modules/zlib.py` | `_zlib` (C module), `deflate`, `io` |
 
 ### Adding a frozen module
 
@@ -444,6 +446,7 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 - `platform`: system, machine, processor, version, fpu, chipset, amiga_info
 - `urequests`: HTTP/1.1 HTTPS client with chunked TE, gzip decompression, buffered I/O
 - `deflate`: compression/decompression (raw deflate, zlib, gzip formats)
+- `zlib`: CPython-compatible zlib API (compress, decompress, crc32) — native C crc32 + frozen Python
 - `gzip`: CPython-compatible gzip.compress()/gzip.decompress() (frozen, wraps deflate)
 
 ### Port-added builtins

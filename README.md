@@ -29,7 +29,7 @@ The Amiga binary executable can be found in [micropython](ports/amiga/build/micr
 - **Precompiled modules**: import and execute `.mpy` bytecode files (compiled with `mpy-cross`)
 - **AmigaOS filesystem**: `os.listdir`, `os.getcwd`, `os.chdir`, `os.mkdir`,
   `os.rmdir`, `os.remove`, `os.rename`, `os.stat`, `os.chmod`, `os.getprotect`,
-  `os.makedirs`, `os.walk`
+  `os.makedirs`, `os.walk`, `os.getenv`, `os.putenv`, `os.unsetenv`
 - **os.path**: join, split, basename, dirname, exists, isfile, isdir, abspath,
   normpath (with AmigaOS volume:path conventions)
 - **Modules**: re, json, math, struct, binascii, base64, time, datetime,

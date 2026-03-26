@@ -298,6 +298,40 @@ static mp_obj_t mod_os_getprotect(mp_obj_t path_obj) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_getprotect_obj, mod_os_getprotect);
 
+// os.getenv(key[, default]) — read an environment variable via GetVar().
+static mp_obj_t mod_os_getenv(size_t n_args, const mp_obj_t *args) {
+    const char *key = mp_obj_str_get_str(args[0]);
+    char buf[256];
+    LONG len = GetVar((CONST_STRPTR)key, (STRPTR)buf, sizeof(buf),
+                      GVF_GLOBAL_ONLY | LV_VAR);
+    if (len < 0) {
+        return (n_args > 1) ? args[1] : mp_const_none;
+    }
+    return mp_obj_new_str(buf, (size_t)len);
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_os_getenv_obj, 1, 2, mod_os_getenv);
+
+// os.putenv(key, value) — set an environment variable via SetVar().
+static mp_obj_t mod_os_putenv(mp_obj_t key_obj, mp_obj_t val_obj) {
+    const char *key = mp_obj_str_get_str(key_obj);
+    size_t val_len;
+    const char *val = mp_obj_str_get_data(val_obj, &val_len);
+    if (!SetVar((CONST_STRPTR)key, (CONST_STRPTR)val, val_len,
+                GVF_GLOBAL_ONLY | LV_VAR)) {
+        mp_raise_OSError(MP_EIO);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(mod_os_putenv_obj, mod_os_putenv);
+
+// os.unsetenv(key) — delete an environment variable via DeleteVar().
+static mp_obj_t mod_os_unsetenv(mp_obj_t key_obj) {
+    const char *key = mp_obj_str_get_str(key_obj);
+    DeleteVar((CONST_STRPTR)key, GVF_GLOBAL_ONLY | LV_VAR);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_os_unsetenv_obj, mod_os_unsetenv);
+
 // uos._cpu() — detect CPU from SysBase->AttnFlags.
 static mp_obj_t mod_os_cpu(void) {
     UWORD flags = SysBase->AttnFlags;
@@ -384,6 +418,9 @@ static const mp_rom_map_elem_t os_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR__fastmem), MP_ROM_PTR(&mod_os_fastmem_obj) },
     { MP_ROM_QSTR(MP_QSTR_chmod), MP_ROM_PTR(&mod_os_chmod_obj) },
     { MP_ROM_QSTR(MP_QSTR_getprotect), MP_ROM_PTR(&mod_os_getprotect_obj) },
+    { MP_ROM_QSTR(MP_QSTR_getenv), MP_ROM_PTR(&mod_os_getenv_obj) },
+    { MP_ROM_QSTR(MP_QSTR_putenv), MP_ROM_PTR(&mod_os_putenv_obj) },
+    { MP_ROM_QSTR(MP_QSTR_unsetenv), MP_ROM_PTR(&mod_os_unsetenv_obj) },
     // AmigaOS protection bit constants (RWED bits 0-3 are INVERTED: 0=allowed)
     { MP_ROM_QSTR(MP_QSTR_FIBF_DELETE), MP_ROM_INT(FIBF_DELETE) },
     { MP_ROM_QSTR(MP_QSTR_FIBF_EXECUTE), MP_ROM_INT(FIBF_EXECUTE) },

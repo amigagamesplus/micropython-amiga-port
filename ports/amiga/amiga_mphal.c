@@ -4,6 +4,7 @@
 
 #include <proto/dos.h>
 #include <proto/exec.h>
+#include <proto/locale.h>
 #include <dos/dos.h>
 
 // usleep() is provided by libnix but not declared under -std=c99
@@ -57,6 +58,18 @@ void mp_hal_stdio_mode_raw(void) {
 // Restore console to cooked mode (line-buffered)
 void mp_hal_stdio_mode_orig(void) {
     SetMode(Input(), 0);  // MODE_CON
+}
+
+// Timezone offset in seconds (local = utc + offset).
+// Uses AmigaOS locale.library: loc_GMTOffset is in minutes, negative = east.
+int32_t mp_hal_timezone_offset_s(void) {
+    struct Locale *locale = OpenLocale(NULL);
+    if (locale) {
+        int32_t offset = -(locale->loc_GMTOffset) * 60;
+        CloseLocale(locale);
+        return offset;
+    }
+    return 0;
 }
 
 // Check for Ctrl-C (SIGBREAKF_CTRL_C) and raise KeyboardInterrupt.

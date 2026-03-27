@@ -4,6 +4,7 @@ _tmod = __import__("time")
 _gmtime = _tmod.gmtime
 _localtime = _tmod.localtime
 _epoch_time = _tmod.time
+_time_ns = _tmod.time_ns
 del _tmod
 
 
@@ -695,7 +696,10 @@ class datetime:
 
     @classmethod
     def now(cls, tz=None):
-        return cls.fromtimestamp(_epoch_time(), tz)
+        ns = _time_ns()
+        us = (ns % 1000000000) // 1000
+        t = _localtime()
+        return cls(t[0], t[1], t[2], t[3], t[4], t[5], us, tz)
 
     @classmethod
     def fromordinal(cls, n):
@@ -944,11 +948,11 @@ class datetime:
                          self.hour, self.minute, self.second, self.microsecond)
 
     def __repr__(self):
-        Y, M, D, h, m, s, us, tz, fold = self.tuple()
-        tz = repr(tz)
-        return "datetime.datetime({}, {}, {}, {}, {}, {}, {}, {}, fold={})".format(
-            Y, M, D, h, m, s, us, tz, fold
-        )
+        if self.microsecond:
+            return "datetime.datetime(%d, %d, %d, %d, %d, %d, %d)" % (
+                self.year, self.month, self.day, self.hour, self.minute, self.second, self.microsecond)
+        return "datetime.datetime(%d, %d, %d, %d, %d, %d)" % (
+            self.year, self.month, self.day, self.hour, self.minute, self.second)
 
     def __str__(self):
         return self.isoformat(" ")

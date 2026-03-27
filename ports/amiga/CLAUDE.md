@@ -374,6 +374,8 @@ Implemented via `modtime.c` (included by extmod/modtime.c via
 - `time.ticks_ms()` / `time.ticks_us()` / `time.ticks_cpu()`: stubs (return 0)
 
 Epoch is 1970 (`MICROPY_EPOCH_IS_1970=1`), matching libnix `time()`.
+`time.localtime()` applies timezone offset from AmigaOS `locale.library`
+(`loc_GMTOffset`). `time.gmtime()` always returns UTC.
 
 ## AmigaOS Specifics
 
@@ -443,7 +445,8 @@ Console is restored to cooked mode in crash handlers (`nlr_jump_fail`,
 ### Frozen (Python modules embedded in binary)
 
 - `base64`: base64, base32, base16 encoding/decoding
-- `datetime`: date, time, datetime, timedelta (patched: fixed __repr__, added strftime)
+- `datetime`: date, time, datetime, timedelta (patched: fixed __repr__, added strftime,
+  datetime.now() with microseconds via time_ns, timezone-aware localtime)
 - `_ospath`: os.path for AmigaOS
 - `os`: os module wrapper (makedirs, walk, path)
 - `platform`: system, machine, processor, version, fpu, chipset, amiga_info

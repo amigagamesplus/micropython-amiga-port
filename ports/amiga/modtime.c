@@ -2,14 +2,26 @@
 // Included by extmod/modtime.c via MICROPY_PY_TIME_INCLUDEFILE.
 
 #include <time.h>
+#include <proto/locale.h>
 #include "shared/timeutils/timeutils.h"
 
-// Get the local time using C standard library gmtime().
+// Get timezone offset in seconds (local = utc + offset).
+// Uses AmigaOS locale.library: loc_GMTOffset is in minutes, negative = east.
+static int32_t amiga_tz_offset_s(void) {
+    struct Locale *locale = OpenLocale(NULL);
+    if (locale) {
+        int32_t offset = -(locale->loc_GMTOffset) * 60;
+        CloseLocale(locale);
+        return offset;
+    }
+    return 0;
+}
+
+// Get the local time (UTC + timezone offset).
 static void mp_time_localtime_get(timeutils_struct_time_t *tm) {
-    time_t t = time(NULL);
+    time_t t = time(NULL) + amiga_tz_offset_s();
     struct tm *gt = gmtime(&t);
     if (gt == NULL) {
-        // Fallback: epoch
         memset(tm, 0, sizeof(*tm));
         tm->tm_year = 1970;
         tm->tm_mon = 1;
@@ -26,7 +38,7 @@ static void mp_time_localtime_get(timeutils_struct_time_t *tm) {
     tm->tm_yday = gt->tm_yday + 1;
 }
 
-// Return the number of seconds since the Epoch.
+// Return the number of seconds since the Epoch (UTC, no timezone).
 static mp_obj_t mp_time_time_get(void) {
     time_t t = time(NULL);
     return mp_obj_new_int((mp_int_t)t);

@@ -37,6 +37,9 @@ static inline void mp_hal_set_interrupt_char(char c) { (void)c; }
     } \
 }
 
+// Timezone offset (local = utc + offset) via locale.library
+int32_t mp_hal_timezone_offset_s(void);
+
 // Console raw/cooked mode switching for readline
 void mp_hal_stdio_mode_raw(void);
 void mp_hal_stdio_mode_orig(void);

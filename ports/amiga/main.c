@@ -305,6 +305,23 @@ int main(int argc, char **argv) {
         mp_deinit();
     } else if (argc > 1) {
         vm_init(argc, argv);
+        // Set sys.path[0] to the script's directory for relative imports.
+        // AmigaOS separators: '/' and ':' (volume prefix).
+        {
+            const char *script = argv[1];
+            const char *last_sep = NULL;
+            for (const char *p = script; *p; p++) {
+                if (*p == '/' || *p == ':') last_sep = p;
+            }
+            if (last_sep != NULL) {
+                size_t dir_len = last_sep - script + 1; // include ':' but not '/'
+                if (*last_sep == '/') dir_len--;         // exclude trailing '/'
+                mp_obj_list_t *path = MP_OBJ_TO_PTR(mp_sys_path);
+                if (path->len > 0) {
+                    path->items[0] = mp_obj_new_str(script, dir_len);
+                }
+            }
+        }
         ret = do_file(argv[1]);
         gc_sweep_all();
         mp_deinit();

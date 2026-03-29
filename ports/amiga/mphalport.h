@@ -44,4 +44,16 @@ int32_t mp_hal_timezone_offset_s(void);
 void mp_hal_stdio_mode_raw(void);
 void mp_hal_stdio_mode_orig(void);
 
+// Override mp_hal_readline so input() switches to raw mode before calling
+// readline (the REPL does this itself, but input() doesn't).
+#include "py/misc.h"
+#include "shared/readline/readline.h"
+static inline int mp_hal_readline(vstr_t *line, const char *prompt) {
+    mp_hal_stdio_mode_raw();
+    int ret = readline(line, prompt);
+    mp_hal_stdio_mode_orig();
+    return ret;
+}
+#define mp_hal_readline mp_hal_readline
+
 #endif // MICROPY_INCLUDED_AMIGA_MPHALPORT_H

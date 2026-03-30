@@ -370,6 +370,8 @@ void nlr_jump_fail(void *val) {
     printf("FATAL: uncaught NLR\n");
     extern void amissl_cleanup(void);
     amissl_cleanup();
+    extern void mod_arexx_deinit(void);
+    mod_arexx_deinit();
     if (heap != NULL) {
         FreeMem(heap, heap_size);
         heap = NULL;
@@ -385,6 +387,8 @@ void __assert_func(const char *file, int line, const char *func, const char *exp
     printf("Assertion '%s' failed, at file %s:%d\n", expr, file, line);
     extern void amissl_cleanup(void);
     amissl_cleanup();
+    extern void mod_arexx_deinit(void);
+    mod_arexx_deinit();
     if (heap != NULL) {
         FreeMem(heap, heap_size);
         heap = NULL;

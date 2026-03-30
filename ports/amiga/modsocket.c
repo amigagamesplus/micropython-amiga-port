@@ -84,10 +84,11 @@ static mp_obj_t socket_accept(mp_obj_t self_in) {
     mp_obj_socket_t *o = mp_obj_malloc(mp_obj_socket_t, &socket_type);
     o->fd = new_fd;
 
+    const char *addr_str = inet_ntoa(addr.sin_addr);
     mp_obj_t tuple[2] = {
         MP_OBJ_FROM_PTR(o),
         mp_obj_new_tuple(2, (mp_obj_t[]){
-            mp_obj_new_str(inet_ntoa(addr.sin_addr), strlen(inet_ntoa(addr.sin_addr))),
+            mp_obj_new_str(addr_str, strlen(addr_str)),
             MP_OBJ_NEW_SMALL_INT(ntohs(addr.sin_port)),
         }),
     };
@@ -203,10 +204,11 @@ static mp_obj_t socket_recvfrom(mp_obj_t self_in, mp_obj_t len_in) {
     }
     vstr.len = n;
 
+    const char *addr_str = inet_ntoa(addr.sin_addr);
     mp_obj_t tuple[2] = {
         mp_obj_new_bytes_from_vstr(&vstr),
         mp_obj_new_tuple(2, (mp_obj_t[]){
-            mp_obj_new_str(inet_ntoa(addr.sin_addr), strlen(inet_ntoa(addr.sin_addr))),
+            mp_obj_new_str(addr_str, strlen(addr_str)),
             MP_OBJ_NEW_SMALL_INT(ntohs(addr.sin_port)),
         }),
     };
@@ -305,13 +307,14 @@ static mp_obj_t mod_getaddrinfo(mp_obj_t host_in, mp_obj_t port_in) {
     mp_obj_t list = mp_obj_new_list(0, NULL);
     for (int i = 0; he->h_addr_list[i] != NULL; i++) {
         struct in_addr *addr = (struct in_addr *)he->h_addr_list[i];
+        const char *addr_str = inet_ntoa(*addr);
         mp_obj_t tuple_items[5] = {
             MP_OBJ_NEW_SMALL_INT(AF_INET),
             MP_OBJ_NEW_SMALL_INT(SOCK_STREAM),
             MP_OBJ_NEW_SMALL_INT(0),
             mp_obj_new_str("", 0),
             mp_obj_new_tuple(2, (mp_obj_t[]){
-                mp_obj_new_str(inet_ntoa(*addr), strlen(inet_ntoa(*addr))),
+                mp_obj_new_str(addr_str, strlen(addr_str)),
                 MP_OBJ_NEW_SMALL_INT(port),
             }),
         };

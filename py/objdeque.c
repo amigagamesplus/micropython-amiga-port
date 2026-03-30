@@ -150,8 +150,8 @@ static mp_obj_t mp_obj_deque_appendleft(mp_obj_t self_in, mp_obj_t arg) {
 static MP_DEFINE_CONST_FUN_OBJ_2(deque_appendleft_obj, mp_obj_deque_appendleft);
 
 static mp_obj_t mp_obj_deque_extend(mp_obj_t self_in, mp_obj_t arg_in) {
-    mp_obj_iter_buf_t iter_buf;
-    mp_obj_t iter = mp_getiter(arg_in, &iter_buf);
+    // AMIGA FIX: force heap iter (m68k stack alignment issue)
+    mp_obj_t iter = mp_getiter(arg_in, NULL);
     mp_obj_t item;
     while ((item = mp_iternext(iter)) != MP_OBJ_STOP_ITERATION) {
         mp_obj_deque_append(self_in, item);

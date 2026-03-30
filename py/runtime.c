@@ -658,8 +658,8 @@ generic_binary_op:
     if (op == MP_BINARY_OP_CONTAINS) {
         // If type didn't support containment then explicitly walk the iterator.
         // mp_getiter will raise the appropriate exception if lhs is not iterable.
-        mp_obj_iter_buf_t iter_buf;
-        mp_obj_t iter = mp_getiter(lhs, &iter_buf);
+        // AMIGA FIX: force heap alloc (stack iter_buf breaks on m68k)
+        mp_obj_t iter = mp_getiter(lhs, NULL);
         mp_obj_t next;
         while ((next = mp_iternext(iter)) != MP_OBJ_STOP_ITERATION) {
             if (mp_obj_equal(next, rhs)) {
@@ -829,8 +829,8 @@ void mp_call_prepare_args_n_kw_var(bool have_self, size_t n_args_n_kw, const mp_
                     // generic iterator
 
                     // extract the variable position args from the iterator
-                    mp_obj_iter_buf_t iter_buf;
-                    mp_obj_t iterable = mp_getiter(arg, &iter_buf);
+                    // AMIGA FIX: force heap alloc (stack iter_buf breaks on m68k)
+                    mp_obj_t iterable = mp_getiter(arg, NULL);
                     mp_obj_t item;
                     while ((item = mp_iternext(iterable)) != MP_OBJ_STOP_ITERATION) {
                         if (args2_len + (n_args - i) >= args2_alloc) {
@@ -956,8 +956,8 @@ void mp_unpack_sequence(mp_obj_t seq_in, size_t num, mp_obj_t *items) {
             items[i] = seq_items[num - 1 - i];
         }
     } else {
-        mp_obj_iter_buf_t iter_buf;
-        mp_obj_t iterable = mp_getiter(seq_in, &iter_buf);
+        // AMIGA FIX: force heap alloc (stack iter_buf breaks on m68k)
+        mp_obj_t iterable = mp_getiter(seq_in, NULL);
 
         for (seq_len = 0; seq_len < num; seq_len++) {
             mp_obj_t el = mp_iternext(iterable);

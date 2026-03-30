@@ -56,7 +56,7 @@ Compiler flags:
 | `modules/platform.py` | Frozen platform module: CPU/FPU/chipset/Kickstart detection via uos C helpers |
 | `modules/urequests.py` | Frozen HTTP/1.1 client (GET, POST, PUT, DELETE, HEAD, chunked TE) |
 | `modules/gzip.py` | Frozen gzip module: CPython-compatible compress()/decompress() |
-| `patches/` | Patches to upstream MicroPython files (see patches/README.md) |
+| `patches/` | Patches to upstream MicroPython files (alignment + iter_buf heap alloc) |
 | `run_tests.py` | Test runner: runs each test in a separate micropython process |
 
 ### Architecture Decisions

@@ -273,8 +273,8 @@ static mp_obj_t set_isdisjoint(mp_obj_t self_in, mp_obj_t other) {
     check_set_or_frozenset(self_in);
     mp_obj_set_t *self = MP_OBJ_TO_PTR(self_in);
 
-    mp_obj_iter_buf_t iter_buf;
-    mp_obj_t iter = mp_getiter(other, &iter_buf);
+    // AMIGA FIX: force heap iter (m68k stack alignment issue)
+    mp_obj_t iter = mp_getiter(other, NULL);
     mp_obj_t next;
     while ((next = mp_iternext(iter)) != MP_OBJ_STOP_ITERATION) {
         if (mp_set_lookup(&self->set, next, MP_MAP_LOOKUP)) {
@@ -307,8 +307,8 @@ static mp_obj_t set_issubset_internal(mp_obj_t self_in, mp_obj_t other_in, bool 
     if (proper && self->set.used == other->set.used) {
         out = mp_const_false;
     } else {
-        mp_obj_iter_buf_t iter_buf;
-        mp_obj_t iter = set_getiter(MP_OBJ_FROM_PTR(self), &iter_buf);
+        // AMIGA FIX: force heap iter (m68k stack alignment issue)
+        mp_obj_t iter = mp_getiter(MP_OBJ_FROM_PTR(self), NULL);
         mp_obj_t next;
         while ((next = set_it_iternext(iter)) != MP_OBJ_STOP_ITERATION) {
             if (!mp_set_lookup(&other->set, next, MP_MAP_LOOKUP)) {

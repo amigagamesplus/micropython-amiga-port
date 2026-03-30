@@ -772,14 +772,10 @@ unwind_jump:;
                 ENTRY(MP_BC_GET_ITER_STACK): {
                     MARK_EXC_IP_SELECTIVE();
                     mp_obj_t obj = TOP();
-                    mp_obj_iter_buf_t *iter_buf = (mp_obj_iter_buf_t*)sp;
                     sp += MP_OBJ_ITER_BUF_NSLOTS - 1;
-                    obj = mp_getiter(obj, iter_buf);
-                    if (obj != MP_OBJ_FROM_PTR(iter_buf)) {
-                        // Iterator didn't use the stack so indicate that with MP_OBJ_NULL.
-                        *(sp - MP_OBJ_ITER_BUF_NSLOTS + 1) = MP_OBJ_NULL;
-                        *(sp - MP_OBJ_ITER_BUF_NSLOTS + 2) = obj;
-                    }
+                    obj = mp_getiter(obj, NULL);  // AMIGA FIX: force heap alloc (stack iter breaks on m68k)
+                    *(sp - MP_OBJ_ITER_BUF_NSLOTS + 1) = MP_OBJ_NULL;
+                    *(sp - MP_OBJ_ITER_BUF_NSLOTS + 2) = obj;
                     DISPATCH();
                 }
 

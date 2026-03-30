@@ -47,3 +47,42 @@ git apply ports/amiga/patches/mpstate_alignment.patch
 After any `git rebase`, `git merge`, or `git pull` that updates
 upstream MicroPython, check if `py/mpstate.h` was modified and
 reapply if the patch was lost.
+
+## patch_iter_buf_heap.py
+
+Python script that patches 7 files in `py/` to force heap allocation for
+iterator buffers instead of using the C stack.
+
+### Why this patch is needed
+
+On m68k, `mp_obj_iter_buf_t` allocated on the C stack can be misaligned,
+causing the VM to fail to recognize the iterator object. This manifests as
+`TypeError: 'X' object isn't an iterator` on `for` loops, `in` operator,
+`all()`, `any()`, `sum()`, `min()`, `max()`, sequence unpacking, and
+`str.join()`.
+
+The fix passes `NULL` instead of `&iter_buf` to `mp_getiter()`, which
+forces MicroPython to allocate the iterator on the GC heap (always
+properly aligned) instead of the C stack.
+
+### Files patched
+
+- `py/vm.c` — `MP_BC_GET_ITER_STACK` opcode
+- `py/runtime.c` — `in` operator, star args unpacking, sequence unpacking
+- `py/modbuiltins.c` — `all()`, `any()`, `min()`/`max()`, `sum()`
+- `py/objdeque.c` — `deque.extend()`
+- `py/objdict.c` — dict view printing
+- `py/objset.c` — `set.isdisjoint()`, `set.issubset()`
+- `py/objstr.c` — `bytes()` constructor
+
+### How to apply
+
+```sh
+cd ../..   # from ports/amiga/ to repo root
+python3 ports/amiga/patches/patch_iter_buf_heap.py
+```
+
+### When to reapply
+
+After any `git rebase`, `git merge`, or `git pull` that updates upstream
+MicroPython. The script is idempotent — safe to run multiple times.

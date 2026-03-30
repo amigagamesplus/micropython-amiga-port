@@ -30,6 +30,7 @@
 #include "py/obj.h"
 #include "py/objstr.h"
 #include "py/nlr.h"
+#include "py/mphal.h"
 
 #include <proto/exec.h>
 #include <proto/rexxsyslib.h>
@@ -141,8 +142,25 @@ static mp_obj_t arexx_send_internal(struct MsgPort *replyPort,
     PutMsg(targetPort, &rexxMsg->rm_Node);
     Permit();
 
-    /* Wait for the reply */
-    WaitPort(replyPort);
+    /* Wait for the reply, with Ctrl-C awareness.
+     * We CANNOT abandon an unreplied ARexx message — the target will
+     * ReplyMsg to our port, and if it's been deleted, the OS crashes.
+     * So on Ctrl-C we note the flag but keep waiting. */
+    ULONG port_sig = 1UL << replyPort->mp_SigBit;
+    ULONG ctrl_c_sig = SIGBREAKF_CTRL_C;
+    bool got_ctrl_c = false;
+    for (;;) {
+        ULONG sigs = Wait(port_sig | ctrl_c_sig);
+        if (sigs & port_sig) {
+            break;
+        }
+        if (sigs & ctrl_c_sig) {
+            if (!got_ctrl_c) {
+                mp_hal_stdout_tx_str("ARexx: waiting for reply, cannot abort safely...\r\n");
+                got_ctrl_c = true;
+            }
+        }
+    }
     GetMsg(replyPort);
 
     /* Extract results */
@@ -166,6 +184,12 @@ static mp_obj_t arexx_send_internal(struct MsgPort *replyPort,
     /* Cleanup message (but NOT the replyPort - caller manages that) */
     DeleteArgstring((UBYTE *)rexxMsg->rm_Args[0]);
     DeleteRexxMsg(rexxMsg);
+
+    /* If Ctrl-C was pressed during wait, raise KeyboardInterrupt now
+     * that the message has been safely replied and cleaned up. */
+    if (got_ctrl_c) {
+        mp_raise_type(&mp_type_KeyboardInterrupt);
+    }
 
     /* Return value */
     if (want_result) {
